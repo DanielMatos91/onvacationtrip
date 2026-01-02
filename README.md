@@ -49,15 +49,68 @@ Para testar localmente, use os emuladores do Firebase. Eles simulam os serviços
     > O app estará disponível em `http://localhost:8082`.
     > A UI dos emuladores estará em `http://localhost:4000`.
 
-## 4. Fluxo de Teste (Convite e Cadastro)
+## 4. Bootstrap Seguro do Primeiro Admin
 
-1.  **Crie um Admin (Manual):**
-    -   Acesse a UI do Emulador de Autenticação (`http://localhost:4000/auth`).
-    -   Crie um usuário (ex: `admin@test.com`).
-    -   Vá para a UI do Emulador do Firestore (`http://localhost:4000/firestore`).
-    -   Na coleção `users`, edite o documento do admin recém-criado e adicione o campo `role` com o valor `"admin"`.
+1. **Defina a BOOTSTRAP_KEY**
+   - **Emuladores:** crie um arquivo `.env.local` na pasta `functions` com `BOOTSTRAP_KEY=...` e rode:
+     ```bash
+     cd functions
+     echo "BOOTSTRAP_KEY=MINHA_CHAVE_FORTE" >> .env.local
+     firebase emulators:start --only functions,firestore,auth
+     ```
+   - **Produção:** defina a variável de ambiente antes do deploy (ex.: em CI/CD) ou use secret:
+     ```bash
+     firebase functions:secrets:set BOOTSTRAP_KEY --data-file <(echo -n "MINHA_CHAVE_FORTE")
+     firebase deploy --only functions
+     ```
+     > A Function lê `process.env.BOOTSTRAP_KEY`; garanta que a variável esteja presente no runtime (secret ou variável exportada) no momento do deploy.
 
-2.  **Crie um Convite (usando a API de Admin):
+2. **Chame a Callable `bootstrapAdmin` (uma única vez)**
+   - Autentique-se com a conta que será o primeiro admin (crie conta via app ou Auth Emulator).
+   - Execute via Flutter (exemplo temporário):
+     ```dart
+     import 'package:cloud_functions/cloud_functions.dart';
+
+     Future<void> bootstrapAdmin(String key) async {
+       final callable = FirebaseFunctions.instance.httpsCallable('bootstrapAdmin');
+       await callable.call({'bootstrapKey': key});
+     }
+     ```
+   - Ou via REST usando o token de auth do usuário autenticado:
+     ```bash
+     curl -X POST \
+       "http://localhost:5001/$(firebase use --json | jq -r '.results.current')/us-central1/bootstrapAdmin" \
+       -H "Content-Type: application/json" \
+       -H "Authorization: Bearer $USER_TOKEN" \
+       -d '{ "data": { "bootstrapKey": "MINHA_CHAVE_FORTE" } }'
+     ```
+
+3. **Desative o bootstrap após uso**
+   - Remova ou limpe `BOOTSTRAP_KEY` do ambiente (apague do `.env.local`, variável de ambiente ou secret) após confirmar que o admin foi criado.
+
+4. **Testes manuais recomendados**
+   - Criar conta, chamar `bootstrapAdmin` com a chave correta e verificar no Firestore `users/{uid}.role == "admin"` e `status == "approved"`.
+   - Repetir a chamada deve falhar com erro de precondition (bootstrap já usado).
+
+5. **Script Node opcional (sem mexer no app Flutter)**
+   ```bash
+   export FIREBASE_API_KEY=...
+   export FIREBASE_AUTH_DOMAIN=...
+   export FIREBASE_PROJECT_ID=...
+   export FIREBASE_APP_ID=...
+   export ADMIN_EMAIL=...
+   export ADMIN_PASSWORD=...
+   export BOOTSTRAP_KEY=...
+   # Para emulador (opcional): export FIREBASE_FUNCTIONS_EMULATOR_HOST=localhost:5001
+   node scripts/bootstrap-admin.mjs
+   ```
+
+## 5. Fluxo de Teste (Convite e Cadastro)
+
+1.  **Crie um Admin (usando bootstrapAdmin uma única vez):**
+    -   Autentique um usuário e chame `bootstrapAdmin` com a chave definida.
+
+2.  **Crie um Convite (usando a API de Admin):**
     -   Use a chamada `curl` abaixo para criar um convite para um futuro motorista.
 
 3.  **Cadastre o Motorista:**
@@ -66,7 +119,7 @@ Para testar localmente, use os emuladores do Firebase. Eles simulam os serviços
     -   Após o login, o app pedirá o código do convite.
     -   Insira o código para ativar a conta do motorista.
 
-## 5. Deploy
+## 6. Deploy
 
 Para fazer o deploy do PWA e das Functions para o ambiente de produção do Firebase:
 
@@ -81,7 +134,7 @@ Para fazer o deploy do PWA e das Functions para o ambiente de produção do Fire
     firebase deploy
     ```
 
-## 6. API para Admin (Exemplos com `curl`)
+## 7. API para Admin (Exemplos com `curl`)
 
 Estas são as chamadas que o painel admin (Lovable) pode fazer. 
 **Importante:** É necessário obter um token de autenticação de um usuário admin do Firebase para incluir no cabeçalho `Authorization`.

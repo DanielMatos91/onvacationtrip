@@ -1,6 +1,11 @@
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import * as dotenv from "dotenv";
+
+if (process.env.FUNCTIONS_EMULATOR === "true") {
+    dotenv.config({path: ".env.local"});
+}
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -211,6 +216,68 @@ exports.redeemInvite = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Bootstraps the first admin using a one-time key stored in an env variable.
+ * @param {{bootstrapKey: string}} data
+ * @param {functions.https.CallableContext} context
+ */
+exports.bootstrapAdmin = functions.https.onCall(async (data, context) => {
+    ensureAuthenticated(context);
+
+    const providedKey = data?.bootstrapKey;
+    const envKey = process.env.BOOTSTRAP_KEY;
+
+    if (!envKey) {
+        throw new functions.https.HttpsError(
+            "failed-precondition",
+            "A variável de ambiente BOOTSTRAP_KEY não está definida."
+        );
+    }
+
+    if (!providedKey || providedKey !== envKey) {
+        throw new functions.https.HttpsError(
+            "permission-denied",
+            "Chave de bootstrap inválida."
+        );
+    }
+
+    const uid = context.auth!.uid;
+    const email = context.auth!.token.email as string | undefined;
+    const displayName = (context.auth!.token.name as string | undefined) || email || uid;
+
+    const bootstrapRef = db.collection("system").doc("bootstrap");
+    const userRef = db.collection("users").doc(uid);
+
+    await db.runTransaction(async (transaction) => {
+        const bootstrapDoc = await transaction.get(bootstrapRef);
+        if (bootstrapDoc.exists && bootstrapDoc.data()?.used === true) {
+            throw new functions.https.HttpsError(
+                "failed-precondition",
+                "O bootstrap já foi utilizado."
+            );
+        }
+
+        const userDoc = await transaction.get(userRef);
+        const existingCreatedAt = userDoc.exists ? userDoc.data()?.createdAt : null;
+
+        transaction.set(bootstrapRef, {
+            used: true,
+            usedAt: admin.firestore.FieldValue.serverTimestamp(),
+            usedBy: uid,
+        }, { merge: true });
+
+        transaction.set(userRef, {
+            role: "admin",
+            status: "approved",
+            name: displayName || email || uid,
+            phoneOrEmail: email || userDoc.data()?.phoneOrEmail || uid,
+            createdAt: existingCreatedAt || admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+    });
+
+    return { success: true };
+});
+
+/**
  * Updates the status of a ride.
  * @param {{rideId: string, nextStatus: string}} data
  * @param {functions.https.CallableContext} context
@@ -310,4 +377,3 @@ exports.driverUpdateLocation = functions.https.onCall(async (data, context) => {
 
     return { success: true };
 });
-

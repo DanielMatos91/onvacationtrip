@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "1089825241516",
+    "project_id": "tripflow-3bef3",
+    "storage_bucket": "tripflow-3bef3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1089825241516:android:320bd84378543af6c66209",
+        "android_client_info": {
+          "package_name": "com.example.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARzIeOZSXd9r0Wt74B2KRAv8WzEkfOSR0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1089825241516:android:345a4d9cba2fe212c66209",
+        "android_client_info": {
+          "package_name": "com.example.myapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARzIeOZSXd9r0Wt74B2KRAv8WzEkfOSR0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1089825241516:android:8fd8ebc82ef0797ac66209",
+        "android_client_info": {
+          "package_name": "com.tripflow.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARzIeOZSXd9r0Wt74B2KRAv8WzEkfOSR0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

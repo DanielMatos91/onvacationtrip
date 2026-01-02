@@ -1,0 +1,64 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserData().role == 'admin';
+    }
+
+    // Users: Admins can read all. Users can only read/update their own doc.
+    match /users/{uid} {
+      allow read, update: if isUser(uid) || isAdmin();
+      allow create, delete: if false; // Creation handled by functions
+    }
+
+    // Drivers: Admins can read/write all. Drivers can only update their own doc.
+    match /drivers/{uid} {
+      allow read, update: if isUser(uid) || isAdmin();
+      allow create, delete: if false; // Creation handled by functions
+    }
+
+    // Invites: Admins can manage invites. No direct user access.
+    match /invites/{code} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
+    // Rides: 
+    // - Admins can read all rides.
+    // - Drivers can only read rides assigned to them.
+    // - All writes must go through Cloud Functions.
+    match /rides/{rideId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.driverId == request.auth.uid);
+      allow create, update, delete: if false; // All mutations via Cloud Functions
+    }
+
+    // Ride Events: 
+    // - Admins can read all.
+    // - Drivers can read events for their own rides.
+    // - Writes must go through Cloud Functions to ensure integrity.
+    match /ride_events/{rideId}/events/{eventId} {
+      allow read: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/rides/$(rideId)).data.driverId == request.auth.uid);
+      allow create, update, delete: if false; // All mutations via Cloud Functions
+    }
+
+    // Support Tickets: Authenticated users can create tickets.
+    match /support_tickets/{ticketId} {
+        allow create: if isSignedIn();
+        allow read, update, delete: if isAdmin();
+    }
+  }
+}
